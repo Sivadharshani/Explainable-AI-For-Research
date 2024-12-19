@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Research Paper Summarizer</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <h1>Research Paper Summarizer</h1>
+    <form action="/summarize" method="post" enctype="multipart/form-data">
+        <label for="pdf">Upload a Research Paper (PDF):</label>
+        <input type="file" name="pdf" accept=".pdf" required>
+        <button type="submit">Summarize</button>
+    </form>
+    <div id="summary-container">
+        <h3>Summary:</h3>
+        <p id="summary-text"></p>
+    </div>
+    <div id="explanation-container">
+        <h3>Word Importance Visualization:</h3>
+        <svg id="bar-chart"></svg>
+    </div>
+
+    <script>
+        document.querySelector("form").onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch("/summarize", {
+                method: "POST",
+                body: formData,
+            });
+            const result = await response.json();
+
+            // Display the summary
+            document.getElementById("summary-text").textContent = result.summary;
+
+            // Display the explanation as a bar chart
+            const data = result.explanation;
+            const svg = d3.select("#bar-chart");
+            svg.selectAll("*").remove(); // Clear previous chart
+
+            const width = 600;
+            const height = 300;
+            const margin = { top: 20, right: 30, bottom: 40, left: 50 };
+
+            svg.attr("width", width).attr("height", height);
+
+            const x = d3.scaleBand()
+                        .domain(data.map(d => d.word))
+                        .range([margin.left, width - margin.right])
+                        .padding(0.1);
+
+            const y = d3.scaleLinear()
+                        .domain([0, d3.max(data, d => d.importance)])
+                        .nice()
+                        .range([height - margin.bottom, margin.top]);
+
+            const xAxis = g => g
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(x).tickSizeOuter(0))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            const yAxis = g => g
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(y))
+                .call(g => g.select(".domain").remove());
+
+            svg.append("g")
+                .selectAll("rect")
+                .data(data)
+                .join("rect")
+                .attr("x", d => x(d.word))
+                .attr("y", d => y(d.importance))
+                .attr("height", d => y(0) - y(d.importance))
+                .attr("width", x.bandwidth())
+                .attr("fill", "steelblue");
+
+            svg.append("g").call(xAxis);
+            svg.append("g").call(yAxis);
+        };
+    </script>
+</body>
+</html>
